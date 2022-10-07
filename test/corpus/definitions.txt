@@ -1,11 +1,10 @@
-=================
-Modules
-=================
+==============================
+module definitions
+==============================
 
 module A
 
-module B
-end
+baremodule B end
 
 module C
 end
@@ -20,51 +19,21 @@ end
     (module_definition (identifier))))
 
 
-=================
-Structs
-=================
+==============================
+type definitions
+==============================
 
-# primitive
 primitive type T 8 end
 primitive type T <: S 16 end
 primitive type Ptr{T} 32 end
 
-# abstract
 abstract type T end
 abstract type T <: S end
 abstract type T{S} <: U end
 
-# empty
-struct NoFields
-end
-
-# mutable
-mutable struct Bar
-  baz
-  qux::Float64
-end
-
-# parametric
-struct Point{T}
-  x::T
-  y::T
-end
-
-# parametric with constraints, parent type
-struct Rational{T<:Integer} <: Real
-  num::T
-  den::T
-end
-
-# parametric fields
-mutable struct Foo<:Bar
-  asd::Vector{Bar}
-end
-
 ---
 
 (source_file
-  (line_comment)
   (primitive_definition
     (identifier)
     (integer_literal))
@@ -77,7 +46,6 @@ end
     (type_parameter_list
       (identifier))
     (integer_literal))
-  (line_comment)
   (abstract_definition
     (identifier))
   (abstract_definition
@@ -87,11 +55,49 @@ end
     (identifier)
     (type_parameter_list
       (identifier))
-    (subtype_clause (identifier)))
-  (line_comment)
+    (subtype_clause (identifier))))
+
+
+==============================
+struct definitions
+==============================
+
+struct Nothing end
+
+struct NewType; field::T end
+
+mutable struct Bar
+  baz
+  qux::Float64
+end
+
+# Parametric types
+struct Point{T}
+  x::T
+  y::T
+end
+
+# Parametric subtypes
+struct Rational{T<:Integer} <: Real
+  num::T
+  den::T
+end
+
+# Parametric fields
+mutable struct Foo <: Bar
+  asd::Vector{Bar}
+end
+
+---
+
+(source_file
   (struct_definition
     (identifier))
-  (line_comment)
+  (struct_definition
+    (identifier)
+    (typed_expression
+      (identifier)
+      (identifier)))
   (struct_definition
     (identifier)
     (identifier)
@@ -117,37 +123,128 @@ end
       (identifier)
       (parameterized_identifier (identifier) (type_argument_list (identifier))))))
 
-===============================
-Functions with typed parameters
-===============================
 
-function a(b::C)
+==============================
+function definitions
+==============================
+
+function f() end
+
+function()
 end
 
-function d{E}(f::E)
+function I(x)
+    x
 end
+
+function ⊕(x, y)
+    x + y
+end
+
+ι(n) = range(1, n)
+
+⊗(x, y) = x * y
 
 ---
 
 (source_file
   (function_definition
-    (identifier)
-    (parameter_list (typed_parameter (identifier) (identifier))))
-  (function_definition
-    (identifier)
-    (type_parameter_list (identifier))
-    (parameter_list (typed_parameter (identifier) (identifier)))))
+    name: (identifier)
+    parameters: (parameter_list))
 
-===============================================
-Functions with optional and keyword parameters
-===============================================
+  (function_definition
+    (parameter_list))
+
+  (function_definition
+    name: (identifier)
+    parameters: (parameter_list (identifier))
+    (identifier))
+
+  (function_definition
+    name: (operator)
+    parameters: (parameter_list (identifier) (identifier))
+    (binary_expression
+      (identifier)
+      (operator)
+      (identifier)))
+
+  (short_function_definition
+    name: (identifier)
+    parameters: (parameter_list (identifier))
+    (call_expression
+      (identifier)
+      (argument_list
+        (integer_literal)
+        (identifier))))
+
+  (short_function_definition
+    name: (operator)
+    parameters: (parameter_list (identifier) (identifier))
+    (binary_expression
+      (identifier)
+      (operator)
+      (identifier))))
+
+
+==============================
+function parameters
+==============================
+
+function f(x::T)
+end
+
+function g(n::N) where {n <: Integer}
+    n
+end
+
+g(n::N) where {n <: Integer} = n
+
+
+Foo{T}(x::T) where {T} = x
 
 function a(b::C = 1; d, e::F = 2)
 end
 
+function apply(f, args...; kwargs...)
+end
+
+Base.show(io::IO, ::MIME"text/plain", m::Method; kwargs...) = show_method(io, m, kwargs)
+
 ---
 
 (source_file
+  (function_definition
+    (identifier)
+    (parameter_list
+      (typed_parameter (identifier) (identifier))))
+
+  (function_definition
+    (identifier)
+    (parameter_list
+      (typed_parameter (identifier) (identifier)))
+    (where_clause
+      (type_parameter_list
+        (constrained_parameter (identifier) (identifier))))
+    (identifier))
+
+  (short_function_definition
+    (identifier)
+    (parameter_list
+      (typed_parameter (identifier) (identifier)))
+    (where_clause
+      (type_parameter_list
+        (constrained_parameter (identifier) (identifier))))
+    (identifier))
+
+  (short_function_definition
+    (identifier)
+    (type_parameter_list (identifier))
+    (parameter_list
+      (typed_parameter (identifier) (identifier)))
+    (where_clause
+      (type_parameter_list (identifier)))
+    (identifier))
+
   (function_definition
     (identifier)
     (parameter_list
@@ -156,43 +253,59 @@ end
         (identifier)
         (optional_parameter
           (typed_parameter (identifier) (identifier))
-          (integer_literal))))))
+          (integer_literal)))))
+  (function_definition
+    (identifier)
+    (parameter_list
+      (identifier)
+      (spread_parameter (identifier))
+      (keyword_parameters
+        (spread_parameter (identifier)))))
 
-============================
-Macro definitions
-======================
+  (short_function_definition
+    (scoped_identifier
+      (identifier)
+      (identifier))
+    (parameter_list
+      (typed_parameter (identifier) (identifier))
+      (typed_parameter (prefixed_string_literal (identifier)))
+      (typed_parameter (identifier) (identifier))
+      (keyword_parameters
+        (spread_parameter (identifier))))
+      (call_expression
+        (identifier)
+        (argument_list
+          (identifier)
+          (identifier)
+          (identifier)))))
 
-macro treelike(T, fs = nothing)
-  fs = [:($(map(QuoteNode, fs.args)...),)]
-  :(treelike(@__MODULE__, $(esc(T)), $(fs...)))
+
+==============================
+macro definitions
+==============================
+
+macro name(s::Symbol)
+    String(s)
 end
+
+macro count(args...) length(args) end
 
 ---
 
 (source_file
-  (macro_definition
-    (identifier)
-    (parameter_list (identifier) (optional_parameter (identifier) (identifier)))
-    (assignment_expression
+    (macro_definition
       (identifier)
-      (operator)
-      (array_expression
-        (quote_expression
-          (tuple_expression
-            (interpolation_expression
-              (parenthesized_expression (spread_expression
-                (call_expression
-                  (identifier)
-                  (argument_list
-                    (identifier)
-                    (field_expression (identifier) (identifier)))))))))))
-    (quote_expression
-      (parenthesized_expression
-        (call_expression
-          (identifier)
-          (argument_list
-            (macro_expression (macro_identifier (identifier)))
-            (interpolation_expression (parenthesized_expression
-              (call_expression (identifier) (argument_list (identifier)))))
-            (interpolation_expression (parenthesized_expression
-              (spread_expression (identifier))))))))))
+      (parameter_list
+        (typed_parameter (identifier) (identifier)))
+      (call_expression
+        (identifier)
+        (argument_list (identifier))))
+
+    (macro_definition
+      (identifier)
+      (parameter_list
+        (spread_parameter (identifier)))
+      (call_expression
+        (identifier)
+        (argument_list (identifier)))))
+
